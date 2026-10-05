@@ -22,6 +22,10 @@
 static void fdiMediaChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
 static void fdiPrefsChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
 
+// Some iOS SDKs don't surface this via the public CoreFoundation headers, but it
+// exists at runtime on iOS. Declare it explicitly.
+extern CFNotificationCenterRef CFNotificationCenterGetDarwinCenter(void);
+
 // Minimal declaration so the compiler knows these SpringBoard methods exist.
 // The class is only ever used inside SpringBoard at runtime.
 @interface SBMediaController : NSObject
