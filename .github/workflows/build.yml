@@ -1,0 +1,40 @@
+name: build
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y perl python3 xz-utils
+
+      - name: Setup Theos
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          git clone --recursive --depth=1 https://github.com/theos/theos.git "$THEOS"
+          ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJf - -C "$THEOS/toolchain"
+          curl -sL https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS15.6.sdk.tar.xz -o sdk.tar.xz
+          mkdir -p "$THEOS/sdks"
+          tar -xJf sdk.tar.xz -C "$THEOS/sdks"
+
+      - name: Build package (rootless)
+        env:
+          THEOS: ${{ github.workspace }}/theos
+        run: |
+          make package THEOS_PACKAGE_SCHEME=rootless FINALPACKAGE=1
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: fakedi-deb
+          path: packages/*.deb
