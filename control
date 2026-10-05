@@ -1,6 +1,6 @@
 Package: com.you.fakedi
 Name: Fake Dynamic Island (A9/iOS15)
-Version: 1.0.0-1
+Version: 1.0.1-1
 Architecture: iphoneos-arm64
 Description: Overlay-only fake Dynamic Island for iPhone 6s / iOS 15. Does NOT modify system files or MobileGestalt - cannot white-apple.
 Depends: preferenceloader, firmware (>= 14.0)
