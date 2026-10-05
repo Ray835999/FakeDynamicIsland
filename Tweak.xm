@@ -224,11 +224,16 @@ static void FDLog(NSString *fmt, ...) {
     if ([[NSProcessInfo processInfo] respondsToSelector:@selector(isLowPowerModeEnabled)]) {
         [nc addObserver:self selector:@selector(refresh) name:NSProcessInfoPowerStateDidChangeNotification object:nil];
     }
-    CFNotificationCenterAddObserver(fdiDarwinCenter(), (__bridge void*)self,
-        &fdiMediaChanged, CFSTR("kMRMediaRemoteNowPlayingInfoDidChangeNotification"), NULL,
-        CFNotificationSuspensionBehaviorCoalesce);
-    CFNotificationCenterAddObserver(fdiDarwinCenter(), (__bridge void*)self,
-        &fdiPrefsChanged, FDI_RELOAD, NULL, CFNotificationSuspensionBehaviorCoalesce);
+    CFNotificationCenterRef dc = fdiDarwinCenter();
+    if (dc) {
+        CFNotificationCenterAddObserver(dc, (__bridge void*)self,
+            &fdiMediaChanged, CFSTR("kMRMediaRemoteNowPlayingInfoDidChangeNotification"), NULL,
+            CFNotificationSuspensionBehaviorCoalesce);
+        CFNotificationCenterAddObserver(dc, (__bridge void*)self,
+            &fdiPrefsChanged, FDI_RELOAD, NULL, CFNotificationSuspensionBehaviorCoalesce);
+    } else {
+        FDLog(@"[FakeDI] Darwin center unavailable; media/prefs live-reload disabled");
+    }
 }
 @end
 
