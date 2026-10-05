@@ -40,6 +40,10 @@ static CFNotificationCenterRef fdiDarwinCenter(void) {
 #define FDI_RELOAD CFSTR("com.you.fakedi/ReloadPrefs")
 #define FDI_LOG_PATH @"/var/mobile/Documents/FakeDynamicIsland.log"
 
+// Tracks whether the overlay has been created, so the deferred-start fallback
+// does not double-initialize.
+static BOOL fdiStarted = NO;
+
 static void FDLog(NSString *fmt, ...) {
     va_list a; va_start(a, fmt);
     NSString *s = [[NSString alloc] initWithFormat:fmt arguments:a];
@@ -60,6 +64,7 @@ static void FDLog(NSString *fmt, ...) {
 @property (nonatomic, assign) CGFloat pw, ph, pcr, pyoff, expandDur, collapseDur;
 @property (nonatomic, assign) BOOL transient;
 + (instancetype)shared;
++ (BOOL)hasStarted;
 - (void)reloadPrefs;
 - (void)applyGeometry;
 - (void)refresh;
@@ -73,8 +78,10 @@ static void FDLog(NSString *fmt, ...) {
     dispatch_once(&t, ^{ s = [[FDIManager alloc] init]; });
     return s;
 }
++ (BOOL)hasStarted { return fdiStarted; }
 - (instancetype)init {
     if ((self = [super init])) {
+        fdiStarted = YES;
         [self reloadPrefs];
         [self setupWindow];
         [self observe];
@@ -237,12 +244,38 @@ static void fdiPrefsChanged(CFNotificationCenterRef center, void *observer, CFSt
     } @catch (id e) {}
 }
 
+// Create the overlay only AFTER SpringBoard has finished launching.
+// Doing UIKit window work synchronously inside %ctor runs during SpringBoard's
+// most fragile boot phase and can deadlock/freeze the device on iOS 15 (the
+// exact "respring -> frozen" symptom). We wait for
+// UIApplicationDidFinishLaunchingNotification (plus a timed fallback) so the
+// window server is ready before we touch any UI.
+static void FDIEnsureStarted(void) {
+    static dispatch_once_t t;
+    dispatch_once(&t, ^{
+        @try { [FDIManager shared]; }
+        @catch (NSException *e) { FDLog(@"[FakeDI] start exception: %@", e); }
+    });
+}
+
 %ctor {
     @try {
         NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
         if (![bid isEqualToString:@"com.apple.springboard"]) { FDLog(@"[FakeDI] skip, not SpringBoard (%@)", bid); return; }
         FDLog(@"[FakeDI] ctor SpringBoard iOS %@", [[UIDevice currentDevice] systemVersion]);
-        [FDIManager shared];
+        // Retain the observer (addObserverForName:queue:usingBlock: removes it
+        // when the returned object is deallocated).
+        static id fdiLaunchObs = nil;
+        fdiLaunchObs = [[NSNotificationCenter defaultCenter]
+            addObserverForName:UIApplicationDidFinishLaunchingNotification
+                        object:nil queue:nil
+                       usingBlock:^(NSNotification *note){ FDIEnsureStarted(); }];
+        // Fallback: if the launch notification is somehow missed, start anyway
+        // after SpringBoard has had time to settle.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{
+                           if (![FDIManager hasStarted]) FDIEnsureStarted();
+                       });
     } @catch (NSException *e) {
         FDLog(@"[FakeDI] ctor exception: %@", e);
     }
