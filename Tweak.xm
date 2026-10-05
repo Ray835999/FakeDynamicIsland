@@ -15,7 +15,21 @@
 // self-drawn island is the only safe path on A9 / iOS 15.
 
 #import <UIKit/UIKit.h>
+#import <CoreFoundation/CoreFoundation.h>
 #import <objc/runtime.h>
+
+// Forward declarations for the Darwin-notification callbacks (defined later).
+static void fdiMediaChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
+static void fdiPrefsChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
+
+// Minimal declaration so the compiler knows these SpringBoard methods exist.
+// The class is only ever used inside SpringBoard at runtime.
+@interface SBMediaController : NSObject
++ (instancetype)sharedInstance;
+- (BOOL)isPlaying;
+- (NSString *)nowPlayingTitle;
+- (NSString *)nowPlayingArtist;
+@end
 
 #define FDI_DOMAIN @"com.you.fakedi"
 #define FDI_RELOAD CFSTR("com.you.fakedi/ReloadPrefs")
@@ -138,9 +152,8 @@ static void FDLog(NSString *fmt, ...) {
     self.window.hidden = NO;
     NSString *txt = nil; NSString *g = @"";
     if (self.showNowPlaying) {
-        Class mcCls = NSClassFromString(@"SBMediaController");
-        if (mcCls) {
-            id mc = [mcCls sharedInstance];
+        if (NSClassFromString(@"SBMediaController")) {
+            SBMediaController *mc = [SBMediaController sharedInstance];
             if (mc && [mc respondsToSelector:@selector(isPlaying)] && [mc isPlaying]) {
                 NSString *t = [mc respondsToSelector:@selector(nowPlayingTitle)]  ? [mc nowPlayingTitle]  : nil;
                 NSString *a = [mc respondsToSelector:@selector(nowPlayingArtist)] ? [mc nowPlayingArtist] : nil;
