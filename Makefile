@@ -9,7 +9,7 @@ TWEAK_NAME = FakeDynamicIsland
 FakeDynamicIsland_FILES = Tweak.xm
 FakeDynamicIsland_CFLAGS = -fobjc-arc
 
-FakeDynamicIslandPrefs_NAME = FakeDynamicIslandPrefs
+BUNDLE_NAME = FakeDynamicIslandPrefs
 FakeDynamicIslandPrefs_FILES = FakeDynamicIslandPrefs.m
 FakeDynamicIslandPrefs_INSTALL_PATH = /Library/PreferenceBundles
 FakeDynamicIslandPrefs_LDFLAGS = -Wl,-undefined,dynamic_lookup
