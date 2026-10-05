@@ -48,10 +48,15 @@ DynamicCow 是 **MacDirtyCow 漏洞应用**，它通过改写系统文件
 
 ## 安装
 
+**首次安装 / 重装必须注销（respring）一次** 才能让 dylib 加载进 SpringBoard：
+
 ```bash
-dpkg -i com.you.fakedi_1.0.0-1_iphoneos-arm64.deb
+dpkg -i com.you.fakedi_1.0.1-1_iphoneos-arm64.deb
 killall -9 SpringBoard
 ```
+
+> 注意：「设置里改外观参数即时生效、不用注销」指的是**已加载后的外观微调**；
+> 但插件本体（dylib）要进 SpringBoard 必须注销一次。Sileo 装完若没自动注销，请手动 killall SpringBoard。
 
 或卸载：
 
@@ -61,6 +66,16 @@ killall -9 SpringBoard
 ```
 
 需要先装 **PreferenceLoader**（设置面板依赖它）。
+
+## 如果注销后卡死（v1.0.0 的已知问题，v1.0.1 已修）
+
+v1.0.0 在 `%ctor`（SpringBoard 启动最脆弱阶段）就同步创建并显示顶层 UIWindow，
+在 iOS 15 上会死锁导致**注销后卡死/冻屏**。v1.0.1 已把窗口创建推迟到
+`UIApplicationDidFinishLaunchingNotification`（SpringBoard 真正启动完成）之后再执行，
+并加了 3 秒兜底定时器，不会再卡。
+
+若你正卡着：Home+电源键强制重启 → 重新 palera1n 引导时**按住音量下**进安全模式 →
+Sileo 卸载 `com.you.fakedi` → 正常重启，再用上面的 v1.0.1 命令重装。
 
 ## 怎么验证（不用终端）
 
