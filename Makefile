@@ -12,7 +12,7 @@ FakeDynamicIsland_CFLAGS = -fobjc-arc
 FakeDynamicIslandPrefs_NAME = FakeDynamicIslandPrefs
 FakeDynamicIslandPrefs_FILES = FakeDynamicIslandPrefs.m
 FakeDynamicIslandPrefs_INSTALL_PATH = /Library/PreferenceBundles
-FakeDynamicIslandPrefs_FRAMEWORKS = Preferences
+FakeDynamicIslandPrefs_LDFLAGS = -Wl,-undefined,dynamic_lookup
 FakeDynamicIslandPrefs_CFLAGS = -fobjc-arc
 
 include $(THEOS_MAKE_PATH)/tweak.mk
