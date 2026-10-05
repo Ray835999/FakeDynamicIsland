@@ -17,23 +17,24 @@
 #import <UIKit/UIKit.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <objc/runtime.h>
+#import <dlfcn.h>
 
 // Forward declarations for the Darwin-notification callbacks (defined later).
 static void fdiMediaChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
 static void fdiPrefsChanged(CFNotificationCenterRef center, void *observer, CFStringRef name, const void *object, CFDictionaryRef userInfo);
 
-// Some iOS SDKs don't surface this via the public CoreFoundation headers, but it
-// exists at runtime on iOS. Declare it explicitly.
-extern CFNotificationCenterRef CFNotificationCenterGetDarwinCenter(void);
-
-// Minimal declaration so the compiler knows these SpringBoard methods exist.
-// The class is only ever used inside SpringBoard at runtime.
-@interface SBMediaController : NSObject
-+ (instancetype)sharedInstance;
-- (BOOL)isPlaying;
-- (NSString *)nowPlayingTitle;
-- (NSString *)nowPlayingArtist;
-@end
+// Resolve the Darwin notification center at runtime via dlsym — the public iOS
+// SDK does not export CFNotificationCenterGetDarwinCenter, so referencing it
+// directly fails to link. This avoids any static symbol reference.
+static CFNotificationCenterRef fdiDarwinCenter(void) {
+    static CFNotificationCenterRef c = NULL;
+    static dispatch_once_t t;
+    dispatch_once(&t, ^{
+        void *sym = dlsym(RTLD_DEFAULT, "CFNotificationCenterGetDarwinCenter");
+        if (sym) c = ((CFNotificationCenterRef (*)(void))sym)();
+    });
+    return c;
+}
 
 #define FDI_DOMAIN @"com.you.fakedi"
 #define FDI_RELOAD CFSTR("com.you.fakedi/ReloadPrefs")
@@ -156,13 +157,17 @@ static void FDLog(NSString *fmt, ...) {
     self.window.hidden = NO;
     NSString *txt = nil; NSString *g = @"";
     if (self.showNowPlaying) {
-        if (NSClassFromString(@"SBMediaController")) {
-            SBMediaController *mc = [SBMediaController sharedInstance];
-            if (mc && [mc respondsToSelector:@selector(isPlaying)] && [mc isPlaying]) {
-                NSString *t = [mc respondsToSelector:@selector(nowPlayingTitle)]  ? [mc nowPlayingTitle]  : nil;
-                NSString *a = [mc respondsToSelector:@selector(nowPlayingArtist)] ? [mc nowPlayingArtist] : nil;
-                if (t && a) txt = [NSString stringWithFormat:@"%@ — %@", t, a];
-                else if (t) txt = t;
+        Class mcCls = NSClassFromString(@"SBMediaController");
+        if (mcCls) {
+            id mc = [(id)mcCls performSelector:@selector(sharedInstance)];
+            if (mc && [mc respondsToSelector:@selector(isPlaying)] &&
+                (BOOL)[mc performSelector:@selector(isPlaying)]) {
+                id t = [mc respondsToSelector:@selector(nowPlayingTitle)]  ? [mc performSelector:@selector(nowPlayingTitle)]  : nil;
+                id a = [mc respondsToSelector:@selector(nowPlayingArtist)] ? [mc performSelector:@selector(nowPlayingArtist)] : nil;
+                NSString *ts = [t isKindOfClass:[NSString class]] ? t : nil;
+                NSString *as = [a isKindOfClass:[NSString class]] ? a : nil;
+                if (ts && as) txt = [NSString stringWithFormat:@"%@ — %@", ts, as];
+                else if (ts) txt = ts;
                 else txt = @"Now Playing";
                 g = @"♪";
             }
@@ -212,10 +217,10 @@ static void FDLog(NSString *fmt, ...) {
     if ([[NSProcessInfo processInfo] respondsToSelector:@selector(isLowPowerModeEnabled)]) {
         [nc addObserver:self selector:@selector(refresh) name:NSProcessInfoPowerStateDidChangeNotification object:nil];
     }
-    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinCenter(), (__bridge void*)self,
+    CFNotificationCenterAddObserver(fdiDarwinCenter(), (__bridge void*)self,
         &fdiMediaChanged, CFSTR("kMRMediaRemoteNowPlayingInfoDidChangeNotification"), NULL,
         CFNotificationSuspensionBehaviorCoalesce);
-    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinCenter(), (__bridge void*)self,
+    CFNotificationCenterAddObserver(fdiDarwinCenter(), (__bridge void*)self,
         &fdiPrefsChanged, FDI_RELOAD, NULL, CFNotificationSuspensionBehaviorCoalesce);
 }
 @end
