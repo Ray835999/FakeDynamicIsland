@@ -21,7 +21,10 @@ jobs:
           THEOS: ${{ github.workspace }}/theos
         run: |
           git clone --recursive --depth=1 https://github.com/theos/theos.git "$THEOS"
-          ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5
+          # Provide libtinfo.so.5 locally (no root needed) and expose via LD_LIBRARY_PATH
+          mkdir -p "$THEOS/toolchain/lib"
+          ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 "$THEOS/toolchain/lib/libtinfo.so.5"
+          echo "LD_LIBRARY_PATH=$THEOS/toolchain/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
           curl -sL https://github.com/L1ghtmann/llvm-project/releases/latest/download/iOSToolchain-x86_64.tar.xz | tar -xJf - -C "$THEOS/toolchain"
           curl -sL https://github.com/theos/sdks/releases/download/master-146e41f/iPhoneOS15.6.sdk.tar.xz -o sdk.tar.xz
           mkdir -p "$THEOS/sdks"
